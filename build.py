@@ -13,11 +13,14 @@ import os
 import re
 import shutil
 import sys
+from datetime import datetime, timezone, timedelta
+from email.utils import format_datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from content import PAGES
-from content.site import (BASE_URL, BRAND, NAV, PHONE, PHONE_DISPLAY)
+from content.site import (BASE_URL, BRAND, BUILD_DATE, GOOGLE_VERIFY,
+                          INDEXNOW_KEY, NAV, NAVER_VERIFY, PHONE, PHONE_DISPLAY)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 MIN_INDEX_CHARS = 2000
@@ -271,6 +274,17 @@ def render_page(page: dict) -> str:
     layout_cls = "page-layout has-toc" if toc_html else "page-layout"
     related_html = render_related(path)
 
+    verify_lines = []
+    if NAVER_VERIFY:
+        verify_lines.append(
+            f'<meta name="naver-site-verification" content="{NAVER_VERIFY}">'
+        )
+    if GOOGLE_VERIFY:
+        verify_lines.append(
+            f'<meta name="google-site-verification" content="{GOOGLE_VERIFY}">'
+        )
+    site_verify = ("\n".join(verify_lines) + "\n") if verify_lines else ""
+
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -279,7 +293,8 @@ def render_page(page: dict) -> str:
 <title>{title}</title>
 <meta name="description" content="{desc}">
 {robots}
-<link rel="canonical" href="{canonical}">
+{site_verify}<link rel="canonical" href="{canonical}">
+<link rel="alternate" type="application/rss+xml" title="{BRAND} 도봉구 출장마사지·홈타이 안내" href="{BASE_URL.rstrip('/')}/rss.xml">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{desc}">
@@ -390,9 +405,19 @@ def render_page(page: dict) -> str:
 """
 
 
+def _priority(path: str):
+    """sitemap 우선순위·갱신주기 — 메인 > 허브 > 일반."""
+    if path == "":
+        return "1.0", "daily"
+    if path in ("dobong-gu/", "dobong-gu/stations/", "themes/", "magazine/",
+                "massage/", "reservation/"):
+        return "0.8", "weekly"
+    return "0.6", "weekly"
+
+
 def build() -> None:
     report = []
-    sitemap_urls = []
+    pages_meta = []  # 색인 허용 페이지: (path, title, desc)
 
     for page in PAGES:
         path = page["path"]  # "" 또는 "dobong-gu/ssangmun-dong/" 형태
@@ -405,25 +430,73 @@ def build() -> None:
         chars = text_length(page["body"])
         noindex = page.get("noindex", False) or chars < MIN_INDEX_CHARS
         if not noindex:
-            sitemap_urls.append(BASE_URL.rstrip("/") + "/" + path)
+            pages_meta.append((path, page["title"], page["desc"]))
         report.append((path or "/", chars, "noindex" if noindex else "index"))
 
-    # sitemap.xml
-    urls = "\n".join(
-        f"  <url><loc>{u}</loc></url>" for u in sitemap_urls
-    )
+    base = BASE_URL.rstrip("/")
+
+    # sitemap.xml (lastmod·changefreq·priority 포함 — 색인 속도 향상)
+    rows = []
+    for path, _title, _desc in pages_meta:
+        pr, cf = _priority(path)
+        rows.append(
+            f"  <url><loc>{base}/{path}</loc>"
+            f"<lastmod>{BUILD_DATE}</lastmod>"
+            f"<changefreq>{cf}</changefreq>"
+            f"<priority>{pr}</priority></url>"
+        )
     with open(os.path.join(ROOT, "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write(
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-            f"{urls}\n</urlset>\n"
+            + "\n".join(rows) + "\n</urlset>\n"
         )
 
-    # robots.txt
+    # rss.xml (네이버·구글 등 피드 기반 발견 보조)
+    kst = timezone(timedelta(hours=9))
+    try:
+        pub_dt = datetime.strptime(BUILD_DATE, "%Y-%m-%d").replace(
+            hour=9, tzinfo=kst)
+    except ValueError:
+        pub_dt = datetime.now(kst)
+    pub_rfc = format_datetime(pub_dt)
+    items = []
+    for path, title, desc in pages_meta:
+        loc = f"{base}/{path}"
+        items.append(
+            "<item>"
+            f"<title>{html.escape(title)}</title>"
+            f"<link>{loc}</link>"
+            f'<guid isPermaLink="true">{loc}</guid>'
+            f"<pubDate>{pub_rfc}</pubDate>"
+            f"<description>{html.escape(desc)}</description>"
+            "</item>"
+        )
+    with open(os.path.join(ROOT, "rss.xml"), "w", encoding="utf-8") as f:
+        f.write(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<rss version="2.0"><channel>\n'
+            f"<title>{html.escape(BRAND)} 도봉구 출장마사지·홈타이 안내</title>\n"
+            f"<link>{base}/</link>\n"
+            "<description>도봉구 출장마사지·홈타이 지역별·역세권별 방문 관리 안내</description>\n"
+            "<language>ko</language>\n"
+            f"<lastBuildDate>{pub_rfc}</lastBuildDate>\n"
+            f'<atom:link xmlns:atom="http://www.w3.org/2005/Atom" '
+            f'href="{base}/rss.xml" rel="self" type="application/rss+xml"/>\n'
+            + "\n".join(items)
+            + "\n</channel></rss>\n"
+        )
+
+    # IndexNow 키 파일 — 루트에서 {KEY}.txt 로 접근 가능해야 한다.
+    with open(os.path.join(ROOT, f"{INDEXNOW_KEY}.txt"), "w",
+              encoding="utf-8") as f:
+        f.write(INDEXNOW_KEY)
+
+    # robots.txt (사이트맵·RSS 명시)
     with open(os.path.join(ROOT, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(
             "User-agent: *\nAllow: /\n\n"
-            f"Sitemap: {BASE_URL.rstrip('/')}/sitemap.xml\n"
+            f"Sitemap: {base}/sitemap.xml\n"
         )
 
     # .nojekyll (GitHub Pages)
@@ -434,7 +507,7 @@ def build() -> None:
     for p, c, r in sorted(report):
         flag = "" if (r == "noindex" or MIN_INDEX_CHARS <= c <= 2500) else "  ⚠"
         print(f"{p.ljust(width)}  {str(c).rjust(5)}  {r}{flag}")
-    print(f"\n{len(report)} pages built, {len(sitemap_urls)} in sitemap.")
+    print(f"\n{len(report)} pages built, {len(pages_meta)} in sitemap/rss.")
 
 
 if __name__ == "__main__":

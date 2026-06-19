@@ -6,6 +6,17 @@ BRAND = "바로GO"
 PHONE = "0508-202-4719"
 PHONE_DISPLAY = "0508-202-4719"
 
+# 검색엔진 사이트 소유확인
+NAVER_VERIFY = "69e52b66aed6583c48592132de886694c2b4f22c"
+GOOGLE_VERIFY = ""  # 구글 서치콘솔 메타 인증값(있으면 입력)
+
+# IndexNow 키 — 빌드 시 루트에 {KEY}.txt 파일로 생성된다.
+# 빙·네이버·얀덱스 등 IndexNow 참여 엔진에 즉시 색인을 통보할 때 사용.
+INDEXNOW_KEY = "e3a77121d24e6d3c7f3b4eb24afc3186"
+
+# 사이트 갱신일(사이트맵 lastmod / RSS pubDate 기준)
+BUILD_DATE = "2026-06-19"
+
 # 상단 메뉴 — 하위 메뉴에는 키워드를 반복하지 않고 지역명·역명만 표시한다.
 NAV = [
     ("홈", "/", []),
