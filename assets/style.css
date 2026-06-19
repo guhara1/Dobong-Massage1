@@ -532,6 +532,44 @@ th { background: var(--panel-2); color: var(--gold-soft); font-family: var(--ser
   letter-spacing: 0.3em; margin-bottom: 16px;
   padding-bottom: 10px; border-bottom: 1px solid var(--line);
 }
+/* 롱테일 내부링크 블록 — 본문 하단 관련 안내 */
+.related-links {
+  margin-top: 34px;
+  padding: 26px 30px 24px;
+  background: linear-gradient(160deg, rgba(200,162,94,0.06), rgba(13,22,38,0.6)), var(--panel);
+  border: 1px solid var(--line-gold);
+  border-radius: 16px;
+}
+.related-title {
+  font-family: var(--serif); font-weight: 700;
+  color: var(--gold-soft); font-size: 1.08rem;
+  margin: 0 0 16px; padding-left: 14px; position: relative;
+}
+.related-title::before {
+  content: ""; position: absolute; left: 0; top: 4px; bottom: 4px;
+  width: 4px; border-radius: 4px;
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+}
+.related-links ul {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px 26px;
+}
+.related-links li { margin: 0; }
+.related-links a {
+  display: inline-flex; align-items: baseline;
+  color: var(--text); font-size: 0.92rem; line-height: 1.5;
+  transition: color 0.15s;
+}
+.related-links a::before {
+  content: "›"; color: var(--gold); font-weight: 700;
+  margin-right: 9px; flex: 0 0 auto;
+}
+.related-links a:hover { color: var(--gold-soft); }
+@media (max-width: 680px) {
+  .related-links { padding: 22px 20px; }
+  .related-links ul { grid-template-columns: 1fr; }
+}
+
 .footer-bottom { border-top: 1px solid var(--line); }
 .footer-bottom-inner {
   display: flex; justify-content: space-between; align-items: center;

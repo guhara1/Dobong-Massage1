@@ -104,6 +104,141 @@ def render_toc(items) -> str:
     )
 
 
+# ── 롱테일 키워드 내부링크 ─────────────────────────────────────────────
+# 페이지마다 문맥에 맞는 이웃 페이지를 골라 롱테일 앵커텍스트로 연결한다.
+# 같은 블록을 전 페이지에 복사하지 않고, 경로별로 다른 조합을 노출해
+# 중복·과최적화 신호를 피하면서 내부링크를 강화한다.
+LT_ANCHOR = {
+    "/dobong-gu/": "도봉구 출장마사지 지역별 예약 안내",
+    "/dobong-gu/ssangmun-dong/": "쌍문동 출장마사지·홈타이 방문 안내",
+    "/dobong-gu/banghak-dong/": "방학동 출장마사지 도봉구청 생활권 안내",
+    "/dobong-gu/chang-dong/": "창동 출장마사지 창동역·녹천역 생활권 안내",
+    "/dobong-gu/dobong-dong/": "도봉동 출장마사지 도봉산역 생활권 안내",
+    "/dobong-gu/stations/": "도봉구 역세권별 출장마사지 안내",
+    "/dobong-gu/stations/chang-dong-station/": "창동역 출장마사지 환승 생활권 안내",
+    "/dobong-gu/stations/ssangmun-station/": "쌍문역 출장마사지 주거권 방문 안내",
+    "/dobong-gu/stations/banghak-station/": "방학역 출장마사지 도봉구청 인근 안내",
+    "/dobong-gu/stations/dobong-station/": "도봉역 출장마사지 도봉동 주거권 안내",
+    "/dobong-gu/stations/dobongsan-station/": "도봉산역 출장마사지 도봉산 입구 안내",
+    "/dobong-gu/stations/nokcheon-station/": "녹천역 출장마사지 창동·월계 경계 안내",
+    "/dobong-gu/stations/madeul-nearby-area/": "마들역 인접 생활권 출장마사지 안내",
+    "/themes/": "도봉구 출장마사지 테마별 관리 안내",
+    "/themes/swedish/": "도봉구 스웨디시 출장마사지 홈타이 안내",
+    "/themes/thai/": "도봉구 타이마사지 출장 방문 안내",
+    "/themes/aroma/": "도봉구 아로마 출장마사지 홈타이 안내",
+    "/themes/homecare/": "도봉구 홈타이 홈케어 방문 관리 안내",
+    "/themes/foot/": "도봉구 발마사지 출장 방문 안내",
+    "/themes/sports/": "도봉구 스포츠·경락 출장마사지 안내",
+    "/themes/24hours/": "도봉구 24시간 출장마사지 심야 예약 안내",
+    "/themes/overnight/": "도봉구 숙박 가능 출장마사지 안내",
+    "/reservation/": "도봉구 출장마사지 예약 방법 안내",
+    "/guide/": "도봉구 출장마사지 이용 전 확인사항 안내",
+    "/courses/": "도봉구 출장마사지 코스·요금 안내",
+    "/massage/": "도봉 출장마사지 이용 절차 안내",
+}
+
+_DONGS = ["ssangmun-dong", "banghak-dong", "chang-dong", "dobong-dong"]
+_STATIONS = ["chang-dong-station", "ssangmun-station", "banghak-station",
+             "dobong-station", "dobongsan-station", "nokcheon-station",
+             "madeul-nearby-area"]
+_KEY_THEMES = ["swedish", "thai", "aroma", "homecare", "foot", "sports",
+               "24hours", "overnight"]
+_DONG_STATIONS = {
+    "ssangmun-dong": ["ssangmun-station"],
+    "banghak-dong": ["banghak-station"],
+    "chang-dong": ["chang-dong-station", "nokcheon-station"],
+    "dobong-dong": ["dobong-station", "dobongsan-station"],
+}
+_STATION_DONG = {
+    "chang-dong-station": "chang-dong", "ssangmun-station": "ssangmun-dong",
+    "banghak-station": "banghak-dong", "dobong-station": "dobong-dong",
+    "dobongsan-station": "dobong-dong", "nokcheon-station": "chang-dong",
+    "madeul-nearby-area": "dobong-dong",
+}
+
+
+def related_for(path: str):
+    cur = "/" + path if path else "/"
+    items = []
+
+    def add(h):
+        if h != cur and h in LT_ANCHOR and h not in items:
+            items.append(h)
+
+    if path == "":  # 메인
+        for h in ["/dobong-gu/", "/dobong-gu/ssangmun-dong/", "/dobong-gu/banghak-dong/",
+                  "/dobong-gu/chang-dong/", "/dobong-gu/dobong-dong/",
+                  "/dobong-gu/stations/chang-dong-station/",
+                  "/dobong-gu/stations/dobongsan-station/",
+                  "/themes/swedish/", "/themes/homecare/", "/reservation/"]:
+            add(h)
+    elif path == "dobong-gu/":  # 지역 허브
+        for d in _DONGS:
+            add(f"/dobong-gu/{d}/")
+        add("/dobong-gu/stations/"); add("/themes/"); add("/reservation/"); add("/guide/")
+    elif path.startswith("dobong-gu/stations/") and path != "dobong-gu/stations/":  # 역 상세
+        st = path.split("/")[2]
+        idx = _STATIONS.index(st)
+        add(f"/dobong-gu/{_STATION_DONG[st]}/")
+        for k in range(1, 4):
+            add(f"/dobong-gu/stations/{_STATIONS[(idx + k) % len(_STATIONS)]}/")
+        add("/dobong-gu/stations/")
+        add(f"/themes/{_KEY_THEMES[idx % len(_KEY_THEMES)]}/")
+        add("/reservation/"); add("/guide/")
+    elif path == "dobong-gu/stations/":  # 역 허브
+        for st in _STATIONS[:6]:
+            add(f"/dobong-gu/stations/{st}/")
+        add("/dobong-gu/"); add("/reservation/")
+    elif path.startswith("dobong-gu/") and path.count("/") == 2:  # 대표 동
+        dong = path.split("/")[1]
+        di = _DONGS.index(dong)
+        for d in _DONGS:
+            if d != dong:
+                add(f"/dobong-gu/{d}/")
+        for stt in _DONG_STATIONS.get(dong, []):
+            add(f"/dobong-gu/stations/{stt}/")
+        add("/dobong-gu/")
+        add(f"/themes/{_KEY_THEMES[di % len(_KEY_THEMES)]}/")
+        add(f"/themes/{_KEY_THEMES[(di + 4) % len(_KEY_THEMES)]}/")
+        add("/reservation/"); add("/guide/")
+    elif path == "themes/":  # 테마 허브
+        for t in _KEY_THEMES:
+            add(f"/themes/{t}/")
+        add("/dobong-gu/"); add("/reservation/")
+    elif path.startswith("themes/") and path != "themes/":  # 테마 상세
+        cnt = sum(ord(c) for c in path)
+        for k in range(len(_KEY_THEMES)):
+            add(f"/themes/{_KEY_THEMES[(cnt + k) % len(_KEY_THEMES)]}/")
+            if len(items) >= 4:
+                break
+        add("/themes/"); add("/dobong-gu/"); add("/reservation/"); add("/guide/")
+    else:  # 안내·매거진·고객센터 등
+        cnt = sum(ord(c) for c in path)
+        add("/dobong-gu/"); add("/dobong-gu/stations/")
+        add(f"/dobong-gu/{_DONGS[cnt % 4]}/")
+        add(f"/dobong-gu/{_DONGS[(cnt + 2) % 4]}/")
+        add(f"/themes/{_KEY_THEMES[cnt % len(_KEY_THEMES)]}/")
+        add(f"/themes/{_KEY_THEMES[(cnt + 3) % len(_KEY_THEMES)]}/")
+        add("/reservation/"); add("/guide/"); add("/courses/")
+    return items[:8]
+
+
+def render_related(path: str) -> str:
+    if path in ("support/privacy/", "support/terms/"):
+        return ""
+    hrefs = related_for(path)
+    if len(hrefs) < 3:
+        return ""
+    lis = "".join(
+        f'<li><a href="{h}">{LT_ANCHOR[h]}</a></li>' for h in hrefs
+    )
+    return (
+        '<nav class="related-links" aria-label="관련 안내">'
+        '<p class="related-title">함께 보면 좋은 도봉구 출장마사지·홈타이 안내</p>'
+        f"<ul>{lis}</ul></nav>"
+    )
+
+
 def render_page(page: dict) -> str:
     path = page["path"]
     title = page["title"]
@@ -134,6 +269,7 @@ def render_page(page: dict) -> str:
     body, toc_items = inject_toc(body)
     toc_html = render_toc(toc_items)
     layout_cls = "page-layout has-toc" if toc_html else "page-layout"
+    related_html = render_related(path)
 
     return f"""<!DOCTYPE html>
 <html lang="ko">
@@ -186,6 +322,7 @@ def render_page(page: dict) -> str:
       {render_breadcrumb(crumbs)}
       {h1_html}
       {body}
+      {related_html}
     </article>
   </div>
 </main>
