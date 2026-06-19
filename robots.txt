@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.dobong-barogo.example.com/sitemap.xml
+Sitemap: https://dobong-massage1.pages.dev/sitemap.xml
